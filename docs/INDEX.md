@@ -53,6 +53,7 @@
 
 | Feature | Last updated | Note |
 |---------|-------------|------|
+| Stable upstream release sync | 2026-08-30 | [stable-release-sync.md](./features/stable-release-sync.md) |
 | Internationalization (FR/EN/DE/ES) | 2026-07-07 | [i18n.md](./features/i18n.md) |
 | MCP server + scoped access-keys | 2026-06-05 | [mcp-server.md](./features/mcp-server.md) |
 | Frontend utilities (lib/utils.ts) | 2026-05-31 | [frontend-utils.md](./features/frontend-utils.md) |

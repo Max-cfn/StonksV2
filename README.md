@@ -1,10 +1,12 @@
 <div align="center">
 
-# Picsou
+# StonksV2
 
 **Self-hosted personal finance dashboard**
 
 Track bank accounts, brokerage, crypto, and net worth — all in one place.
+
+Personal continuation of [Picsou Finance](https://github.com/Zoeille/picsou-finance), maintained from its stable releases.
 
 [![License: Apache 2.0 + Commons Clause](https://img.shields.io/badge/License-Apache%202.0%20%2B%20Commons%20Clause-blue.svg)](LICENSE)
 
@@ -82,8 +84,8 @@ Track bank accounts, brokerage, crypto, and net worth — all in one place.
 ### 1. Clone
 
 ```bash
-git clone https://github.com/Zoeille/picsou-finance.git
-cd picsou-finance
+git clone https://github.com/Max-cfn/StonksV2.git
+cd StonksV2
 ```
 
 ### 2. Run (zero-config)

@@ -2,7 +2,7 @@ name: Build & publish Docker images
 
 on:
   push:
-    branches: ['**']
+    branches: [main]
     tags: ['[0-9]*', 'v[0-9]*']
   workflow_dispatch:
 
@@ -55,7 +55,6 @@ jobs:
 
       # Tag strategy (applied to every matrix image):
       #   - push on main             -> nightly + latest
-      #   - push on any other branch -> branch name (e.g. 1.0.0, feature-foo)
       #   - push of a version tag    -> latest + the semver (e.g. 1.0.0, 1.0, 1)
       - name: Extract metadata
         id: meta
