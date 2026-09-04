@@ -33,6 +33,7 @@ public class DashboardService {
     private final AccountHoldingRepository holdingRepository;
     private final HistoryService historyService;
     private final AccountService accountService;
+    private final AccountAccessResolver accessResolver;
 
     public DashboardService(
         AccountRepository accountRepository,
@@ -41,7 +42,8 @@ public class DashboardService {
         PriceService priceService,
         AccountHoldingRepository holdingRepository,
         HistoryService historyService,
-        AccountService accountService
+        AccountService accountService,
+        AccountAccessResolver accessResolver
     ) {
         this.accountRepository = accountRepository;
         this.goalService = goalService;
@@ -50,10 +52,13 @@ public class DashboardService {
         this.holdingRepository = holdingRepository;
         this.historyService = historyService;
         this.accountService = accountService;
+        this.accessResolver = accessResolver;
     }
 
     public DashboardResponse getDashboard(Long memberId, String range) {
-        List<Account> accounts = accountRepository.findAllByMemberIdOrderByCreatedAtAsc(memberId);
+        // Owned accounts plus any the member co-owns; each contributes only their share.
+        List<Account> accounts = accessResolver.readableAccounts(memberId);
+        Map<Long, BigDecimal> shares = accessResolver.sharesFor(accounts, memberId);
 
         // Pre-load all holdings and group by account
         Map<Long, List<AccountHolding>> holdingsByAccount = new HashMap<>();
@@ -83,21 +88,24 @@ public class DashboardService {
                 accountValue = priceService.toEur(account.getCurrentBalance(), account.getCurrency(), account.getTicker());
                 accountInvested = accountValue;
             } else {
-                BigDecimal investedValue = BigDecimal.ZERO;
-                for (AccountHolding h : holdings) {
-                    BigDecimal qty = h.getQuantity();
-                    BigDecimal avgBuy = h.getAverageBuyIn() != null ? h.getAverageBuyIn() : BigDecimal.ZERO;
-
-                    investedValue = investedValue.add(qty.multiply(avgBuy));
-                }
-                // Keep the dashboard on the same account-level valuation path as account
-                // cards and history. In particular, Bourse Direct falls back atomically to
-                // its authoritative EUR total when Yahoo/OpenFIGI cannot resolve an ISIN.
-                accountValue = accountService.liveBalanceEur(account);
-                log.info("getDashboard: account={} holdings={} accountValue={} investedValue={}",
-                    account.getId(), holdings.size(), accountValue, investedValue);
-                accountInvested = investedValue;
+                // One pass for both figures. Summing the cost basis here while taking the value
+                // from liveBalanceEur is exactly the asymmetry that reported an untouched account
+                // at -85%: the value drops a holding it cannot price, the inline loop kept that
+                // holding's full purchase cost. valuation() excludes it from both sides, and
+                // still falls back atomically to a provider's own EUR total (Bourse Direct,
+                // Amundi) when a price lookup fails.
+                AccountService.Valuation valuation = accountService.valuation(account);
+                accountValue = valuation.liveEur();
+                accountInvested = valuation.investedEur();
             }
+
+            // Apply the member's share once, here: accountValues feeds both the hero totals
+            // and buildDistribution, so weighting in one place keeps the pie consistent with
+            // the headline figure. Accounts with no split resolve to 100% and are untouched.
+            BigDecimal share = shares.get(account.getId());
+            accountValue = AccountAccessResolver.weigh(accountValue, share);
+            accountInvested = AccountAccessResolver.weigh(accountInvested, share);
+
             accountValues.put(account.getId(), accountValue);
 
             if (account.getType() == AccountType.LOAN) {
