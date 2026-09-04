@@ -41,7 +41,14 @@ jobs:
                 --title "$tag" --notes "Based on Picsou Finance $tag."
             fi
           else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
+            title="Stable sync $tag needs review"
+            if gh api "repos/$GITHUB_REPOSITORY/issues?state=open&per_page=100" \
+              --jq '.[].title' | grep -Fxq "$title"; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+              echo "Review issue already open for $tag."
+            else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
       - name: Prepare stable update
@@ -57,21 +64,24 @@ jobs:
           git switch -c "$branch"
 
           if ! git merge --no-ff "$TAG" -m "chore: sync $TAG"; then
+            conflicts=$(git diff --name-only --diff-filter=U)
             git merge --abort
-            title="Stable sync $TAG failed"
-            if ! gh issue list --state open --search "${title} in:title" \
-              --json title --jq '.[].title' | grep -Fxq "$title"; then
-              gh issue create --title "$title" \
-                --body "The daily merge of Picsou Finance $TAG has conflicts."
-            fi
-            exit 1
+            title="Stable sync $TAG needs review"
+            body=$(printf 'The stable release cannot be merged automatically.\n\nConflicts:\n```\n%s\n```\n\nRun: %s/actions/runs/%s' \
+              "$conflicts" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")
+            gh api --method POST "repos/$GITHUB_REPOSITORY/issues" \
+              -f title="$title" -f body="$body" >/dev/null || true
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Stable release $TAG needs manual review."
+            exit 0
           fi
 
           git push origin "$branch"
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "ready=true" >> "$GITHUB_OUTPUT"
 
       - name: Open and validate pull request
-        if: steps.release.outputs.changed == 'true'
+        if: steps.update.outputs.ready == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}

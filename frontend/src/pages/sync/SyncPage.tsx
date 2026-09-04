@@ -9,7 +9,9 @@ import { TradeRepublicTab } from './TradeRepublicTab'
 import { IbkrTab } from './IbkrTab'
 import { FinaryTab } from './FinaryTab'
 import { BourseDirectTab } from './BourseDirectTab'
-// BoursoTab hidden for 1.0.0 — sidecar integration not finished.
+import { DegiroTab } from './DegiroTab'
+import { AmundiTab } from './AmundiTab'
+import { BoursoTab } from './BoursoTab'
 
 export function SyncPage() {
   const { t } = useTranslation()
@@ -25,8 +27,11 @@ export function SyncPage() {
           <TabsTrigger value="exchanges">{t('sync.exchanges.title')}</TabsTrigger>
           <TabsTrigger value="wallets">{t('sync.wallets.title')}</TabsTrigger>
           <TabsTrigger value="tr">{t('sync.tr.title')}</TabsTrigger>
+          <TabsTrigger value="bourso">{t('sync.bourso.title')}</TabsTrigger>
           <TabsTrigger value="bourse-direct">{t('sync.bourseDirect.title')}</TabsTrigger>
+          <TabsTrigger value="degiro">{t('sync.degiro.title')}</TabsTrigger>
           <TabsTrigger value="ibkr">{t('sync.ibkr.title')}</TabsTrigger>
+          <TabsTrigger value="amundi">{t('sync.amundi.title')}</TabsTrigger>
           <TabsTrigger value="finary">{t('sync.finary.title')}</TabsTrigger>
         </TabsList>
         <TabsContent value="banks" className="mt-6">
@@ -41,11 +46,20 @@ export function SyncPage() {
         <TabsContent value="tr" className="mt-6">
           <TradeRepublicTab />
         </TabsContent>
+        <TabsContent value="bourso" className="mt-6">
+          <BoursoTab />
+        </TabsContent>
         <TabsContent value="bourse-direct" className="mt-6">
           <BourseDirectTab />
         </TabsContent>
+        <TabsContent value="degiro" className="mt-6">
+          <DegiroTab />
+        </TabsContent>
         <TabsContent value="ibkr" className="mt-6">
           <IbkrTab />
+        </TabsContent>
+        <TabsContent value="amundi" className="mt-6">
+          <AmundiTab />
         </TabsContent>
         <TabsContent value="finary" className="mt-6">
           <FinaryTab />

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
-  useAccount, useAccountHistory, useHoldingsWithLivePrices,
+  useAccount, useAccountHistory, useHoldingsWithLivePrices, useAccountPositions,
   useAccountTransactions, useAddTransaction, useDeleteTransaction,
   useUpdateTransaction, useUpdateHolding, useDeleteHolding
 } from '@/features/accounts/hooks'
@@ -10,6 +10,7 @@ import { useHistory } from '@/features/history/hooks'
 import { BalanceHistoryChart } from '@/components/shared/BalanceHistoryChart'
 import { NetWorthChart } from '@/components/shared/NetWorthChart'
 import { HoldingsTable } from '@/components/shared/HoldingsTable'
+import { PositionsByProduct } from '@/components/shared/PositionsByProduct'
 import { RealizedPnlSection } from '@/components/shared/RealizedPnlSection'
 import { TransactionsList } from '@/components/shared/TransactionsList'
 import { AddTransactionModal } from '@/components/shared/AddTransactionModal'
@@ -20,6 +21,7 @@ import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay'
 import { AccountTypeBadge } from '@/components/shared/AccountTypeBadge'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoanDetailSection } from '@/components/loan/LoanDetailSection'
+import { PropertyDetailSection } from '@/components/property/PropertyDetailSection'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -29,7 +31,7 @@ import { accountTypeLabelKey } from '@/lib/constants'
 import { type TimeRange } from '@/components/shared/TimeRangeSelector'
 import type { HoldingResponse, Transaction } from '@/types/api'
 
-const HOLDING_ACCOUNT_TYPES = ['PEA', 'COMPTE_TITRES', 'CRYPTO']
+const HOLDING_ACCOUNT_TYPES = ['PEA', 'COMPTE_TITRES', 'CRYPTO', 'EMPLOYEE_SAVINGS']
 
 export function AccountDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -40,6 +42,7 @@ export function AccountDetailPage() {
   const { data: account, isLoading } = useAccount(accountId)
   const { data: history } = useAccountHistory(accountId)
   const { data: holdings } = useHoldingsWithLivePrices(accountId)
+  const { data: positions } = useAccountPositions(accountId)
   const { data: transactions } = useAccountTransactions(accountId)
   const addTxMutation = useAddTransaction(accountId)
   const deleteTxMutation = useDeleteTransaction(accountId)
@@ -59,6 +62,7 @@ export function AccountDetailPage() {
 
   const chartData = (history ?? []).map(s => ({ date: s.date, balance: s.balance }))
   const isLoan = account?.type === 'LOAN'
+  const isRealEstate = account?.type === 'REAL_ESTATE'
   const showHoldings = account ? HOLDING_ACCOUNT_TYPES.includes(account.type) : false
   const recentSnapshots = [...(history ?? [])].reverse().slice(0, 10)
 
@@ -161,6 +165,9 @@ export function AccountDetailPage() {
       {/* Loan detail */}
       {isLoan && account && <LoanDetailSection accountId={account.id} />}
 
+      {/* Property detail: description, valuation, financing and ownership split */}
+      {isRealEstate && account && <PropertyDetailSection account={account} />}
+
       {/* History chart */}
       {!isLoan && showHoldings && pnlData && pnlData.length > 1 ? (
         <Card>
@@ -182,14 +189,19 @@ export function AccountDetailPage() {
         </Card>
       ) : null}
 
-      {/* Holdings */}
+      {/* Holdings — grouped by product when the connector reports one (crypto exchanges),
+          otherwise the flat table. */}
       {showHoldings && (
         holdings ? (
-          <HoldingsTable
-            holdings={holdings}
-            onEdit={setEditingHolding}
-            onDelete={(h) => deleteHoldingMutation.mutate(h.ticker)}
-          />
+          positions && positions.length > 0 ? (
+            <PositionsByProduct positions={positions} />
+          ) : (
+            <HoldingsTable
+              holdings={holdings}
+              onEdit={setEditingHolding}
+              onDelete={(h) => deleteHoldingMutation.mutate(h.ticker)}
+            />
+          )
         ) : (
           <Card>
             <CardContent className="pt-6">
