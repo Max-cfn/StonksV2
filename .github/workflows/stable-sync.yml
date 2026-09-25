@@ -38,11 +38,7 @@ jobs:
 
           if git merge-base --is-ancestor "$tag" HEAD; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-              git push origin "refs/tags/$tag"
-              gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
-                --title "$tag" --notes "Based on Picsou Finance $tag."
-            fi
+            echo "$tag is already integrated."
           else
             title="Stable sync $tag needs review"
             branch="automation/stable-$tag"
