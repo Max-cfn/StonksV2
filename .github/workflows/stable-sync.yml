@@ -15,6 +15,9 @@ concurrency:
   group: stable-release-sync
   cancel-in-progress: false
 
+env:
+  UPSTREAM_REPOSITORY: Cloeille/picsou-finance
+
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -28,8 +31,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag=$(gh api repos/Zoeille/picsou-finance/releases/latest --jq .tag_name)
-          git remote add upstream https://github.com/Zoeille/picsou-finance.git
+          tag=$(gh api "repos/$UPSTREAM_REPOSITORY/releases/latest" --jq .tag_name)
+          git remote add upstream "https://github.com/$UPSTREAM_REPOSITORY.git"
           git fetch upstream "refs/tags/$tag:refs/tags/$tag"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
@@ -42,7 +45,12 @@ jobs:
             fi
           else
             title="Stable sync $tag needs review"
-            if gh api "repos/$GITHUB_REPOSITORY/issues?state=open&per_page=100" \
+            branch="automation/stable-$tag"
+            if gh api "repos/$GITHUB_REPOSITORY/pulls?state=open&head=$GITHUB_REPOSITORY_OWNER:$branch" \
+              --jq 'length' | grep -Fxq 1; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+              echo "A pull request is already open for $tag."
+            elif gh api "repos/$GITHUB_REPOSITORY/issues?state=open&per_page=100" \
               --jq '.[].title' | grep -Fxq "$title"; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
               echo "Review issue already open for $tag."
@@ -58,7 +66,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
         run: |
-          branch="automation/stable-${TAG}-${GITHUB_RUN_ID}"
+          branch="automation/stable-$TAG"
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git switch -c "$branch"
@@ -76,7 +84,7 @@ jobs:
             exit 0
           fi
 
-          git push origin "$branch"
+          git push --force-with-lease origin "$branch"
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
           echo "ready=true" >> "$GITHUB_OUTPUT"
 
@@ -87,8 +95,35 @@ jobs:
           TAG: ${{ steps.release.outputs.tag }}
           BRANCH: ${{ steps.update.outputs.branch }}
         run: |
-          pr=$(gh pr create --base main --head "$BRANCH" \
-            --title "chore: sync $TAG" \
-            --body "Stable upstream release: $TAG.")
+          if ! pr=$(gh api --method POST "repos/$GITHUB_REPOSITORY/pulls" \
+            -f base=main -f head="$BRANCH" \
+            -f title="chore: sync $TAG" \
+            -f body="Stable upstream release: $TAG." --jq .number); then
+            echo "::warning::GitHub refused pull request creation for $TAG."
+            exit 0
+          fi
+
           gh workflow run ci.yml --ref "$BRANCH"
-          gh pr merge "$pr" --auto --merge --delete-branch
+          sha=$(git rev-parse HEAD)
+          run_id=""
+          for _ in {1..12}; do
+            run_id=$(gh run list --workflow ci.yml --branch "$BRANCH" \
+              --event workflow_dispatch --limit 10 \
+              --json databaseId,headSha \
+              --jq "map(select(.headSha == \"$sha\"))[0].databaseId // empty")
+            test -n "$run_id" && break
+            sleep 5
+          done
+
+          if test -z "$run_id" || ! gh run watch "$run_id" --exit-status; then
+            echo "::warning::CI needs review for $TAG."
+            exit 0
+          fi
+
+          merged=$(gh api --method PUT "repos/$GITHUB_REPOSITORY/pulls/$pr/merge" \
+            -f merge_method=merge --jq .merged)
+          if test "$merged" = true; then
+            git push origin --delete "$BRANCH"
+          else
+            echo "::warning::Pull request $pr is ready but was not merged."
+          fi
