@@ -46,10 +46,14 @@ jobs:
           else
             title="Stable sync $tag needs review"
             branch="automation/stable-$tag"
-            if gh api "repos/$GITHUB_REPOSITORY/pulls?state=open&head=$GITHUB_REPOSITORY_OWNER:$branch" \
-              --jq 'length' | grep -Fxq 1; then
+            pr=$(gh api "repos/$GITHUB_REPOSITORY/pulls?state=open&head=$GITHUB_REPOSITORY_OWNER:$branch" \
+              --jq '.[0].number // empty')
+            if test -n "$pr"; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
-              echo "A pull request is already open for $tag."
+              echo "resume=true" >> "$GITHUB_OUTPUT"
+              echo "branch=$branch" >> "$GITHUB_OUTPUT"
+              echo "pr=$pr" >> "$GITHUB_OUTPUT"
+              echo "Resuming pull request $pr for $tag."
             elif gh api "repos/$GITHUB_REPOSITORY/issues?state=open&per_page=100" \
               --jq '.[].title' | grep -Fxq "$title"; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
@@ -89,18 +93,22 @@ jobs:
           echo "ready=true" >> "$GITHUB_OUTPUT"
 
       - name: Open and validate pull request
-        if: steps.update.outputs.ready == 'true'
+        if: steps.update.outputs.ready == 'true' || steps.release.outputs.resume == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
-          BRANCH: ${{ steps.update.outputs.branch }}
+          BRANCH: ${{ steps.update.outputs.branch || steps.release.outputs.branch }}
+          EXISTING_PR: ${{ steps.release.outputs.pr }}
         run: |
-          if ! pr=$(gh api --method POST "repos/$GITHUB_REPOSITORY/pulls" \
-            -f base=main -f head="$BRANCH" \
-            -f title="chore: sync $TAG" \
-            -f body="Stable upstream release: $TAG." --jq .number); then
-            echo "::warning::GitHub refused pull request creation for $TAG."
-            exit 0
+          pr="$EXISTING_PR"
+          if test -z "$pr"; then
+            if ! pr=$(gh api --method POST "repos/$GITHUB_REPOSITORY/pulls" \
+              -f base=main -f head="$BRANCH" \
+              -f title="chore: sync $TAG" \
+              -f body="Stable upstream release: $TAG." --jq .number); then
+              echo "::warning::GitHub refused pull request creation for $TAG."
+              exit 0
+            fi
           fi
 
           gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH"
