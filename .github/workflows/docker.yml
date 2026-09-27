@@ -2,7 +2,6 @@ name: Build & publish Docker images
 
 on:
   push:
-    branches: [main]
     tags: ['[0-9]*', 'v[0-9]*']
   workflow_dispatch:
 
@@ -64,7 +63,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Tag strategy (applied to every matrix image):
-      #   - push on main             -> nightly + latest
+      #   - manual run on main       -> nightly + latest
       #   - push of a version tag    -> latest + the semver (e.g. 1.0.0, 1.0, 1)
       - name: Extract metadata
         id: meta
