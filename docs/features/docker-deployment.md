@@ -178,9 +178,9 @@ docker load < picsou-release.tar.gz
 
 ### Pulling from GHCR
 
-All three images are published by `.github/workflows/docker.yml` on every push
-(matrix build, one entry per image). To deploy from the registry instead of
-building or loading a tar.gz:
+Images are published by `.github/workflows/docker.yml` for version tags or a
+manual workflow run (matrix build, one entry per image). To deploy from the
+registry instead of building or loading a tar.gz:
 
 ```bash
 # Replace 1.0.0 with the desired tag (nightly, branch name, or semver).
@@ -190,8 +190,8 @@ docker pull ghcr.io/zoeille/picsou-finance/bourse-direct-auth:1.0.0
 ```
 
 Tag scheme:
-- `main` push → `nightly`
-- other branch push → branch name (e.g. `1.0.0`, `feature-foo`)
+- manual run on `main` → `nightly`
+- manual run on another branch → branch name (e.g. `feature-foo`)
 - version tag (`1.0.0` or `v1.0.0`) → `latest` + semver (`1.0.0`, `1.0`, `1`)
 
 ### Build version shown in the app
